@@ -1,17 +1,38 @@
 #!/bin/bash
-domain=$(head -n 1 $1)
-while IFS=  read -r urls;
-do
-	url=$(echo "$urls" | grep -m 1 -i "$urls");
-	check=$(echo $url | grep -o "[\?\\&]\w*=");
-	parameter=$(echo $check | grep -o "\w*");
-	if [[ -n $parameter ]]
-	then
-		echo $parameter >> parameter.txt
-		ins="https://google.com"
-		if curl -LIs "$url$check$ins" | grep -Ei 'location: (https?:)?[/\\]{2,}google.com' > /dev/null;
-		then
-			echo "$url";
-		fi
-	fi
-done < $1
+
+# Check if a file with URLs is provided
+if [[ -z "$1" ]]; then
+  echo "Usage: $0 <urls.txt>"
+  exit 1
+fi
+
+# Extract the filename from the input (without extension)
+filename=$(basename "$1" .txt)
+
+# Create a dynamic file for storing full URLs with parameters (e.g., inputfilename_param.txt)
+param_file="${filename}_param.txt"
+
+# Empty the param_file if it exists, to avoid appending to an old file
+> "$param_file"
+
+# Loop through each URL in the input file
+while IFS= read -r url; do
+  # Check if the URL contains any parameters (e.g., ?param= or &param=)
+  check=$(echo "$url" | grep -o "[\?\\&]\w*=")
+  
+  # If a parameter exists in the URL
+  if [[ -n "$check" ]]; then
+    # Save the full URL with the parameter to the dynamically named param_file in real-time
+    echo "$url" >> "$param_file"
+    
+    # Open redirection testing
+    # Append an open redirection payload to the URL
+    payload="https://google.com"
+    
+    # Use curl to check if the URL redirects to the payload (google.com)
+    if curl -LIs "${url}${check}${payload}" | grep -Ei 'location: (https?:)?[/\\]{2,}google.com' > /dev/null; then
+      # If vulnerable, print the URL
+      echo "$url"
+    fi
+  fi
+done < "$1"
